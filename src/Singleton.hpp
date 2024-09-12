@@ -25,8 +25,9 @@
 
 #include <iostream>
 #include <vector>
-#include "Aliases.hpp"
 #include "common.hpp"
+
+#include "Comments.hpp"
 
 using namespace ppl;
 
@@ -35,14 +36,16 @@ class Singleton {
     std::vector<std::string> _pathnames;
     std::vector<long> _lines;
     static Singleton* _shared;
+    
 public:
     enum class Scope {
         Global = 1,
         Local  = 2
     };
     Scope scope = Scope::Global;
+    
+    Comments comments;
 
-    Aliases aliases;
     
     int nestingLevel = 0;
     

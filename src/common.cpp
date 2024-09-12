@@ -124,7 +124,23 @@ bool file_exists(const std::string &filename) {
     return file_exists(filename.c_str());
 }
 
+std::string& lpad(std::string &str, const char c, int n) {
+    std::string s;
+    s = c;
+    while (n-- > 0) {
+        str.insert(0, s);
+    }
+    return str;
+}
 
+std::string lpad(const char c, int n) {
+    std::string s, str;
+    s = c;
+    while (n-- > 0) {
+        str.insert(0, s);
+    }
+    return str;
+}
 
 
 

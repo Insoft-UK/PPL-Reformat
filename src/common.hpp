@@ -56,5 +56,7 @@ std::ifstream::pos_type file_size(const std::string &filename);
 bool file_exists(const char *filename);
 bool file_exists(const std::string &filename);
 
+std::string& lpad(std::string &str, const char c, int n);
+std::string lpad(const char c, int n);
 
 #endif /* common_hpp */

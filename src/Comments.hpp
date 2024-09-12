@@ -1,5 +1,5 @@
 /*
- Copyright © 2024 Insoft. All rights reserved.
+ Copyright © 2023 Insoft. All rights reserved.
  
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -20,25 +20,24 @@
  THE SOFTWARE.
  */
 
-#ifndef PREPROCESSOR_HPP
-#define PREPROCESSOR_HPP
+#ifndef COMMENTS_HPP
+#define COMMENTS_HPP
 
 #include <iostream>
-#include <list>
-#include <vector>
-#include <stdint.h>
 
 namespace ppl {
 
-class Preprocessor {
+class Comments {
+private:
+    std::string _preservedComment;
 public:
-
     bool verbose = false;
-    bool python = false;
-    
-    bool parse(std::string &str);
+
+    void preserveComment(const std::string &str);
+    std::string& removeComment(std::string &str);
+    std::string& restoreComment(std::string &str);
 };
 
 }
 
-#endif /* PREPROCESSOR_HPP */
+#endif /* COMMENTS_HPP */

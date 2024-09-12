@@ -298,7 +298,6 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
     
     Singleton *singleton = Singleton::shared();
     
-    static int globalVariableAliasCount = -1, localVariableAliasCount = -1, functionAliasCount = -1;
     
     // The UTF16-LE data first needs to be converted to UTF8 before it can be proccessed.
     uint16_t *utf16_str = (uint16_t *)ln.c_str();
@@ -330,10 +329,8 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
     strings.preserveStrings(ln);
     
     // Remove any comments.
-    size_t pos = ln.find("//");
-    if (pos != std::string::npos) {
-        ln.resize(pos);
-    }
+    singleton->comments.preserveComment(ln);
+    singleton->comments.removeComment(ln);
     
     // Remove sequences of whitespaces to a single whitespace.
     ln = std::regex_replace(ln, std::regex(R"(\s+)"), " ");
@@ -351,7 +348,19 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
     ln = regex_replace(ln, std::regex(R"(>=)"), "≥");
     ln = regex_replace(ln, std::regex(R"(<=)"), "≤");
     ln = regex_replace(ln, std::regex(R"(<>)"), "≠");
-    ln = regex_replace(ln, std::regex(R"(==)"), "=");
+
+    ln = regex_replace(ln, std::regex(R"(,)"), ", ");
+    ln = regex_replace(ln, std::regex(R"(\()"), "( ");
+    ln = regex_replace(ln, std::regex(R"(\))"), " )");
+    
+    ln = regex_replace(ln, std::regex(R"(THEN (.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
+    ln = regex_replace(ln, std::regex(R"(;(.+;))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
+    
+    r = R"(≥|≤|≠|==|:=|\+|-|\*|\/)";
+    ln = regex_replace(ln, r, " $0 ");
+    
+    r = R"(([≥≤≠=:\+|-|\*|\/]) +- +)";
+    ln = regex_replace(ln, r, "$1 -");
     
     r = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
     for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
@@ -364,115 +373,26 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
         singleton->nestingLevel--;
         if (0 == singleton->nestingLevel) {
             singleton->scope = Singleton::Scope::Global;
-            singleton->aliases.removeAllLocalAliases();
-            localVariableAliasCount = -1;
         }
     }
     
-    Aliases::TIdentity identity;
-    
     if (Singleton::Scope::Global == singleton->scope) {
-        identity.scope = Aliases::Scope::Global;
-        
-        // LOCAL
-        ln = regex_replace(ln, std::regex(R"(\bLOCAL +)"), "");
-        
-        // Function
         r = R"(^([A-Za-z]\w*)\(([\w,]*)\);?$)";
         if (regex_search(ln, m, r)) {
-            identity.type = Aliases::Type::Function;
-            identity.identifier = m.str(1);
-            identity.real = "f" + base10ToBase32(++functionAliasCount);
-            singleton->aliases.append(identity);
-            
-            std::string s = m.str(2);
-            int count = -1;
-            identity.scope = Aliases::Scope::Local;
-            identity.type = Aliases::Type::Property;
-            r = R"([A-Za-z]\w*)";
-            for(auto it = std::sregex_iterator(s.begin(), s.end(), r); it != std::sregex_iterator(); ++it) {
-                if (it->str().length() < 3) continue;
-                identity.identifier = it->str();
-                identity.real = "p" + base10ToBase32(++count);
-                
-                if (ln.back() == ';') {
-                    ln = regex_replace(ln, std::regex(identity.identifier), identity.real);
-                } else {
-                    if (!singleton->aliases.exists(identity)) {
-                        singleton->aliases.append(identity);
-                    }
-                }
-            }
-            identity.scope = Aliases::Scope::Global;
-        }
-        
-        
-        // Global Variable
-        r = R"(\b(?:LOCAL )?([A-Za-z]\w*)(?::=.*);)";
-        if (regex_search(ln, m, r)) {
-            identity.type = Aliases::Type::Variable;
-            identity.identifier = m.str(1);
-            identity.real = "g" + base10ToBase32(++globalVariableAliasCount);// = os.str();
-            
-            singleton->aliases.append(identity);
+            if (ln.back() != ';') ln.insert(0, "\n");
         }
     }
     
     if (Singleton::Scope::Local == singleton->scope) {
-        identity.scope = Aliases::Scope::Local;
-        
-        // LOCAL
-        r = R"(\bLOCAL (?:[A-Za-z]\w*[,;])+)";
-        if (regex_search(ln, m, r)) {
-            std::string matched = m.str();
-            r = R"([A-Za-z]\w*(?=[,;]))";
-            
-            for(auto it = std::sregex_iterator(matched.begin(), matched.end(), r); it != std::sregex_iterator(); ++it) {
-                if (it->str().length() < 3) continue;
-                identity.type = Aliases::Type::Variable;
-                identity.identifier = it->str();
-                identity.real = "v" + base10ToBase32(++localVariableAliasCount);
-                
-                singleton->aliases.append(identity);
-            }
-        }
-        
-        r = R"(\bLOCAL ([A-Za-z]\w*)(?::=))";
-        if (regex_search(ln, m, r)) {
-            identity.type = Aliases::Type::Variable;
-            identity.identifier = m.str(1);
-            identity.real = "v" + base10ToBase32(++localVariableAliasCount);
-            
-            singleton->aliases.append(identity);
-        }
-        
-        ln = regex_replace(ln, std::regex(R"(\(\))"), "");
-        
-        while (regex_search(ln, m, std::regex(R"(^[A-Za-z]\w*:=[^;]*;)"))) {
-            std::string matched = m.str();
-            
-            /*
-             eg. v1:=v2+v4;
-             Group  0 v1:=v2+v4;
-                    1 v1
-                    2 v2+v4
-            */
-            r = R"(([A-Za-z]\w*):=(.*);)";
-            auto it = std::sregex_token_iterator {
-                matched.begin(), matched.end(), r, {2, 1}
-            };
-            if (it != std::sregex_token_iterator()) {
-                std::stringstream ss;
-                ss << *it++ << "▶" << *it << ";";
-                ln = ln.replace(m.position(), m.length(), ss.str());
-            }
-        }
     }
     
-    ln = singleton->aliases.resolveAliasesInText(ln);
     strings.restoreStrings(ln);
+    singleton->comments.restoreComment(ln);
     
-    ln = regex_replace(ln, std::regex(R"([^;,\[\]\{\}]$)"), "$0\n");
+    if (!regex_match(ln, std::regex(R"(\bBEGIN\b)")))
+        lpad(ln, ' ', singleton->nestingLevel * 2);
+//    ln = regex_replace(ln, std::regex(R"([^;,\[\]\{\}]$)"), "$0\n");
+    ln += "\n";
 }
 
 // MARK: - Command Line
@@ -582,9 +502,7 @@ int main(int argc, char **argv) {
     
     std::string str;
 
-//    Singleton::shared()->pushPathname(in_filename);
     process( infile, outfile );
-//    Singleton::shared()->popPathname();
     
     // Stop measuring time and calculate the elapsed time.
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -600,10 +518,6 @@ int main(int argc, char **argv) {
         std::cout << "ERRORS!\n";
         remove(out_filename.c_str());
         return 0;
-    }
-    
-    if (!Singleton::shared()->aliases.descendingOrder && Singleton::shared()->aliases.verbose) {
-        Singleton::shared()->aliases.dumpIdentities();
     }
     
     // Percentage Reduction = (Original Size - New Size) / Original Size * 100
