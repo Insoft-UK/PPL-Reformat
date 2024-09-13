@@ -391,10 +391,10 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
     ln = regex_replace(ln, std::regex(R"(\})"), " }");
     ln = regex_replace(ln, std::regex(R"(^ +(\} *;))"), "$1\n");
 
-    ln = regex_replace(ln, std::regex(R"(:=)"), ":§");
-    ln = regex_replace(ln, std::regex(R"(==)"), "§§");
-    ln = regex_replace(ln, std::regex(R"(=)"), "==");
-    ln = regex_replace(ln, std::regex(R"(§)"), "=");
+//    ln = regex_replace(ln, std::regex(R"(:=)"), ":§");
+//    ln = regex_replace(ln, std::regex(R"(==)"), "§§");
+//    ln = regex_replace(ln, std::regex(R"(=)"), "==");
+//    ln = regex_replace(ln, std::regex(R"(§)"), "=");
 
     r = R"(≥|≤|≠|==|:=|\+|-|\*|\/)";
     ln = regex_replace(ln, r, " $0 ");
