@@ -238,23 +238,23 @@ void processLine(const std::string& str, std::ofstream& outfile) {
     singleton.incrementLineNumber();
 }
 
-void processLines(std::ifstream &infile, std::ofstream &outfile)
-{
-    std::string s;
-    
-    char c;
-    while (!infile.eof()) {
-        infile.get(c);
-        s += c;
-        if (c == 0x0A) {
-            infile.seekg(1, std::ios_base::cur);
-            processLine(s, outfile);
-            s = std::string("");
-        }
-        
-        infile.peek();
-    }
-}
+//void processLines(std::ifstream &infile, std::ofstream &outfile)
+//{
+//    std::string s;
+//    
+//    char c;
+//    while (!infile.eof()) {
+//        infile.get(c);
+//        s += c;
+//        if (c == 0x0A) {
+//            infile.seekg(1, std::ios_base::cur);
+//            processLine(s, outfile);
+//            s = std::string("");
+//        }
+//        
+//        infile.peek();
+//    }
+//}
 
 void processStringLines(std::istringstream &iss, std::ofstream &outfile)
 {
@@ -272,7 +272,33 @@ void process(std::ifstream &infile, std::ofstream &outfile)
         return;
     }
    
-    processLines(infile, outfile);
+    std::string str;
+    
+    char c;
+    while (!infile.eof()) {
+        infile.get(c);
+        str += c;
+        infile.peek();
+    }
+    
+    
+    // The UTF16-LE data first needs to be converted to UTF8 before it can be proccessed.
+    uint16_t *utf16_str = (uint16_t *)str.c_str();
+    str = utf16_to_utf8(utf16_str, str.size() / 2);
+    
+    std::regex r;
+    
+    
+    
+    r = R"(\bTHEN\b)";
+    str = regex_replace(str, r, "$0\n");
+
+    r = R"(\bEND;)";
+    str = regex_replace(str, r, "\n$0");
+    
+    std::istringstream iss;
+    iss.str(str);
+    processStringLines(iss, outfile);
 }
 
 
@@ -295,13 +321,13 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
     std::regex r;
     std::smatch m;
     std::ifstream infile;
-    
+    static std::string indentation("");
     Singleton *singleton = Singleton::shared();
     
     
     // The UTF16-LE data first needs to be converted to UTF8 before it can be proccessed.
-    uint16_t *utf16_str = (uint16_t *)ln.c_str();
-    ln = utf16_to_utf8(utf16_str, ln.size() / 2);
+//    uint16_t *utf16_str = (uint16_t *)ln.c_str();
+//    ln = utf16_to_utf8(utf16_str, ln.size() / 2);
     
     if (preprocessor.python) {
         // We're presently handling Python code.
@@ -328,12 +354,11 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
      */
     strings.preserveStrings(ln);
     
-    // Remove any comments.
-    singleton->comments.preserveComment(ln);
-    singleton->comments.removeComment(ln);
+    
+    
     
     // Remove sequences of whitespaces to a single whitespace.
-    ln = std::regex_replace(ln, std::regex(R"(\s+)"), " ");
+//    ln = std::regex_replace(ln, std::regex(R"(\s+)"), " ");
 
     // Remove any leading white spaces before or after.
     trim(ln);
@@ -343,26 +368,41 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
         return;
     }
     
+    // Remove any comments.
+    singleton->comments.preserveComment(ln);
+    singleton->comments.removeComment(ln);
+    
     ln = removeWhitespaceAroundOperators(ln);
     
+//    // We turn any keywords that are in lowercase to uppercase
+//    r = std::regex(R"(\b(return|kill|if|then|else|xor|or|and|not|case|default|iferr|ifte|for|from|step|downto|to|do|while|repeat|until|break|continue|export|const|local|key)\b)", std::regex_constants::icase);
+//    for(std::sregex_iterator it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
+//        std::string result = it->str();
+//        std::transform(result.begin(), result.end(), result.begin(), ::toupper);
+//        ln = ln.replace(it->position(), it->length(), result);
+//    }
+//    
     ln = regex_replace(ln, std::regex(R"(>=)"), "≥");
     ln = regex_replace(ln, std::regex(R"(<=)"), "≤");
     ln = regex_replace(ln, std::regex(R"(<>)"), "≠");
-
+//
     ln = regex_replace(ln, std::regex(R"(,)"), ", ");
-    ln = regex_replace(ln, std::regex(R"(\()"), "( ");
-    ln = regex_replace(ln, std::regex(R"(\))"), " )");
-    
-    ln = regex_replace(ln, std::regex(R"(THEN (.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
-    ln = regex_replace(ln, std::regex(R"(;(.+;))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
-    
+    ln = regex_replace(ln, std::regex(R"(\{)"), "{ ");
+    ln = regex_replace(ln, std::regex(R"(\})"), " }");
+    ln = regex_replace(ln, std::regex(R"(^ +(\} *;))"), "$1\n");
+
+    ln = regex_replace(ln, std::regex(R"(:=)"), ":§");
+    ln = regex_replace(ln, std::regex(R"(==)"), "§§");
+    ln = regex_replace(ln, std::regex(R"(=)"), "==");
+    ln = regex_replace(ln, std::regex(R"(§)"), "=");
+
     r = R"(≥|≤|≠|==|:=|\+|-|\*|\/)";
     ln = regex_replace(ln, r, " $0 ");
     
     r = R"(([≥≤≠=:\+|-|\*|\/]) +- +)";
     ln = regex_replace(ln, r, "$1 -");
     
-    r = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
+    r = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
     for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
         singleton->nestingLevel++;
         singleton->scope = Singleton::Scope::Local;
@@ -376,22 +416,37 @@ void preProcess(std::string &ln, std::ofstream &outfile) {
         }
     }
     
-    if (Singleton::Scope::Global == singleton->scope) {
-        r = R"(^([A-Za-z]\w*)\(([\w,]*)\);?$)";
-        if (regex_search(ln, m, r)) {
-            if (ln.back() != ';') ln.insert(0, "\n");
-        }
-    }
+    
     
     if (Singleton::Scope::Local == singleton->scope) {
+//        ln = regex_replace(ln, std::regex(R"(THEN (.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
+//        ln = regex_replace(ln, std::regex(R"(;(.+;))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
+        if (!regex_search(ln, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)"))) {
+            lpad(ln, ' ', singleton->nestingLevel * 2);
+        } else {
+            lpad(ln, ' ', (singleton->nestingLevel - 1) * 2);
+        }
+        ln = regex_replace(ln, std::regex(R"(\(\s*\))"), "");
     }
-    
+//    
     strings.restoreStrings(ln);
     singleton->comments.restoreComment(ln);
+    rtrim(ln);
     
-    if (!regex_match(ln, std::regex(R"(\bBEGIN\b)")))
-        lpad(ln, ' ', singleton->nestingLevel * 2);
-//    ln = regex_replace(ln, std::regex(R"([^;,\[\]\{\}]$)"), "$0\n");
+    if (Singleton::Scope::Global == singleton->scope) {
+        ln = regex_replace(ln, std::regex(R"(END;)"), "$0\n");
+        
+//        r = R"(^([A-Za-z]\w*)\(([\w,]*)\);?$)";
+//        if (regex_search(ln, m, r)) {
+//            if (ln.back() != ';') ln.insert(0, "\n");
+//        }
+    }
+    
+    ln = regex_replace(ln, std::regex(R"(// *-+$)"), "// MARK: -");
+    ln = regex_replace(ln, std::regex(R"( +(// *.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
+    
+    ln = regex_replace(ln, std::regex(R"(^ *(\[|\d))"), lpad(' ', (singleton->nestingLevel + 1) * 2) + "$1");
+    
     ln += "\n";
 }
 
