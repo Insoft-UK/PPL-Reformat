@@ -52,7 +52,6 @@ void terminator() {
 void (*old_terminate)() = std::set_terminate(terminator);
 
 
-void preProcess(std::string &ln, std::ofstream &outfile);
 
 // MARK: - Utills
 
@@ -208,11 +207,134 @@ std::string base10ToBase32(unsigned int num) {
 
 // MARK: - Pre-Processing...
 
+void reformatLine(std::string &ln, std::ofstream &outfile) {
+    std::regex r;
+    std::smatch m;
+    std::ifstream infile;
+    static std::string indentation("");
+    Singleton *singleton = Singleton::shared();
+
+    
+    if (preprocessor.python) {
+        // We're presently handling Python code.
+        preprocessor.parse(ln);
+        ln += '\n';
+        return;
+    }
+    
+    if (preprocessor.parse(ln)) {
+        if (preprocessor.python) {
+            // Indicating Python code ahead with the #PYTHON preprocessor, we maintain the line unchanged and return to the calling function.
+            ln += '\n';
+            return;
+        }
+        
+        ln = std::string("");
+        return;
+    }
+    
+    /*
+     While parsing the contents, strings may inadvertently undergo parsing, leading
+     to potential disruptions in the string's content.
+     To address this issue, we prioritize the preservation of any existing strings.
+     Subsequently, after parsing, any strings that have been universally altered can
+     be restored to their original state.
+     */
+    strings.preserveStrings(ln);
+
+    // Remove any leading white spaces before or after.
+    trim(ln);
+    
+    if (ln.length() < 1) {
+        ln = std::string("");
+        return;
+    }
+    
+    // Remove any comments.
+    singleton->comments.preserveComment(ln);
+    singleton->comments.removeComment(ln);
+    
+    ln = removeWhitespaceAroundOperators(ln);
+    
+    ln = regex_replace(ln, std::regex(R"(>=)"), "≥");
+    ln = regex_replace(ln, std::regex(R"(<=)"), "≤");
+    ln = regex_replace(ln, std::regex(R"(<>)"), "≠");
+
+    ln = regex_replace(ln, std::regex(R"(,)"), ", ");
+    ln = regex_replace(ln, std::regex(R"(\{)"), "{ ");
+    ln = regex_replace(ln, std::regex(R"(\})"), " }");
+    ln = regex_replace(ln, std::regex(R"(^ +(\} *;))"), "$1\n");
+    
+    /*
+     To prevent correcting over-modifications, first replace all double `==` with a single `=`.
+     
+     Converting standalone `=` to `==` initially can lead to unintended changes like `<=`, `>=`,
+     `:=`, and `==` turning into `<==`, `>==`, `:==`, and `===`.
+     
+     By first reverting all double `==` back to a single `=`, and ensuring that only standalone
+     `=` or `:=` with surrounding whitespace are targeted, we can then safely convert `=` to `==`
+     without affecting other operators.
+     */
+    ln = regex_replace(ln, std::regex(R"(==)"), "=");
+
+    // Ensuring that standalone `≥`, `≤`, `≠`, `=`, `:=`, `+`, `-`, `*` and `/` have surrounding whitespace.
+    r = R"(≥|≤|≠|=|:=|\+|-|\*|\/)";
+    ln = regex_replace(ln, r, " $0 ");
+    
+    r = R"(([≥≤≠=:\+|-|\*|\/]) +- +)";
+    ln = regex_replace(ln, r, "$1 -");
+    
+    if (!regex_search(ln, std::regex(R"(LOCAL [A-Za-z]\w* = )"))) {
+        // We can now safely convert `=` to `==` without affecting other operators.
+        ln = regex_replace(ln, std::regex(R"( = )"), " == ");
+    }
+    
+    
+    r = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
+    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
+        singleton->nestingLevel++;
+        singleton->scope = Singleton::Scope::Local;
+    }
+    
+    r = std::regex(R"(\b(?:END|UNTIL)\b)", std::regex_constants::icase);
+    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
+        singleton->nestingLevel--;
+        if (0 == singleton->nestingLevel) {
+            singleton->scope = Singleton::Scope::Global;
+        }
+    }
+    
+    
+    if (Singleton::Scope::Local == singleton->scope) {
+        if (!regex_search(ln, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)"))) {
+            lpad(ln, ' ', singleton->nestingLevel * 2);
+        } else {
+            lpad(ln, ' ', (singleton->nestingLevel - 1) * 2);
+        }
+        ln = regex_replace(ln, std::regex(R"(\(\s*\))"), "");
+    }
+
+    strings.restoreStrings(ln);
+    singleton->comments.restoreComment(ln);
+    rtrim(ln);
+    
+    if (Singleton::Scope::Global == singleton->scope) {
+        ln = regex_replace(ln, std::regex(R"(END;)"), "$0\n");
+    }
+    
+    ln = regex_replace(ln, std::regex(R"(// *-+$)"), "// MARK: -");
+    ln = regex_replace(ln, std::regex(R"( +(// *.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
+    
+    ln = regex_replace(ln, std::regex(R"(^ *(\[|\d))"), lpad(' ', (singleton->nestingLevel + 1) * 2) + "$1");
+    
+    ln += "\n";
+}
+
 void processLine(const std::string& str, std::ofstream& outfile) {
     Singleton& singleton = *Singleton::shared();
     std::string ln = str;
     
-    preProcess(ln, outfile);
+    reformatLine(ln, outfile);
     
     for ( int n = 0; n < ln.length(); n++) {
         uint8_t *ascii = (uint8_t *)&ln.at(n);
@@ -238,25 +360,7 @@ void processLine(const std::string& str, std::ofstream& outfile) {
     singleton.incrementLineNumber();
 }
 
-//void processLines(std::ifstream &infile, std::ofstream &outfile)
-//{
-//    std::string s;
-//    
-//    char c;
-//    while (!infile.eof()) {
-//        infile.get(c);
-//        s += c;
-//        if (c == 0x0A) {
-//            infile.seekg(1, std::ios_base::cur);
-//            processLine(s, outfile);
-//            s = std::string("");
-//        }
-//        
-//        infile.peek();
-//    }
-//}
-
-void processStringLines(std::istringstream &iss, std::ofstream &outfile)
+void processLines(std::istringstream &iss, std::ofstream &outfile)
 {
     std::string s;
     
@@ -272,6 +376,7 @@ void process(std::ifstream &infile, std::ofstream &outfile)
         return;
     }
    
+    // Read in the whole of the file into a `std::string`
     std::string str;
     
     char c;
@@ -287,168 +392,29 @@ void process(std::ifstream &infile, std::ofstream &outfile)
     str = utf16_to_utf8(utf16_str, str.size() / 2);
     
     std::regex r;
-    
-    
-    
-    r = R"(\bTHEN\b)";
+
+    /*
+     Pre-correct any `THEN`, `DO` or `REPEAT` statements that are followed by other statements on the
+     same line by moving the additional statement(s) to the next line. This ensures that the code
+     is correctly processed, as it separates the conditional or loop structure from the subsequent
+     statements for proper handling.
+     */
+    r = R"(\b(THEN|DO|REPEAT)\b)";
     str = regex_replace(str, r, "$0\n");
+    
+    // Make sure all `LOCAL` are on seperate lines.
+    r = R"(\bLOCAL\b)";
+    str = regex_replace(str, r, "\n$0");
 
     r = R"(\bEND;)";
     str = regex_replace(str, r, "\n$0");
     
     std::istringstream iss;
     iss.str(str);
-    processStringLines(iss, outfile);
+    processLines(iss, outfile);
 }
 
 
-void processString(const std::string &str, std::ofstream &outfile) {
-    Singleton &singleton = *Singleton::shared();
-    
-    std::string ln;
-    
-    singleton.pushPathname("");
-
-    std::istringstream iss{ str };
-    
-    processStringLines(iss, outfile);
-
-    singleton.popPathname();
-}
-
-
-void preProcess(std::string &ln, std::ofstream &outfile) {
-    std::regex r;
-    std::smatch m;
-    std::ifstream infile;
-    static std::string indentation("");
-    Singleton *singleton = Singleton::shared();
-    
-    
-    // The UTF16-LE data first needs to be converted to UTF8 before it can be proccessed.
-//    uint16_t *utf16_str = (uint16_t *)ln.c_str();
-//    ln = utf16_to_utf8(utf16_str, ln.size() / 2);
-    
-    if (preprocessor.python) {
-        // We're presently handling Python code.
-        preprocessor.parse(ln);
-        ln += '\n';
-        return;
-    }
-    
-    if (preprocessor.parse(ln)) {
-        if (preprocessor.python) {
-            // Indicating Python code ahead with the #PYTHON preprocessor, we maintain the line unchanged and return to the calling function.
-            ln += '\n';
-            return;
-        }
-        
-        ln = std::string("");
-        return;
-    }
-    
-    /*
-     While parsing the contents, strings may inadvertently undergo parsing, leading to potential disruptions in the string's content.
-     To address this issue, we prioritize the preservation of any existing strings. Subsequently, after parsing, any strings that have
-     been universally altered can be restored to their original state.
-     */
-    strings.preserveStrings(ln);
-    
-    
-    
-    
-    // Remove sequences of whitespaces to a single whitespace.
-//    ln = std::regex_replace(ln, std::regex(R"(\s+)"), " ");
-
-    // Remove any leading white spaces before or after.
-    trim(ln);
-    
-    if (ln.length() < 1) {
-        ln = std::string("");
-        return;
-    }
-    
-    // Remove any comments.
-    singleton->comments.preserveComment(ln);
-    singleton->comments.removeComment(ln);
-    
-    ln = removeWhitespaceAroundOperators(ln);
-    
-//    // We turn any keywords that are in lowercase to uppercase
-//    r = std::regex(R"(\b(return|kill|if|then|else|xor|or|and|not|case|default|iferr|ifte|for|from|step|downto|to|do|while|repeat|until|break|continue|export|const|local|key)\b)", std::regex_constants::icase);
-//    for(std::sregex_iterator it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
-//        std::string result = it->str();
-//        std::transform(result.begin(), result.end(), result.begin(), ::toupper);
-//        ln = ln.replace(it->position(), it->length(), result);
-//    }
-//    
-    ln = regex_replace(ln, std::regex(R"(>=)"), "≥");
-    ln = regex_replace(ln, std::regex(R"(<=)"), "≤");
-    ln = regex_replace(ln, std::regex(R"(<>)"), "≠");
-//
-    ln = regex_replace(ln, std::regex(R"(,)"), ", ");
-    ln = regex_replace(ln, std::regex(R"(\{)"), "{ ");
-    ln = regex_replace(ln, std::regex(R"(\})"), " }");
-    ln = regex_replace(ln, std::regex(R"(^ +(\} *;))"), "$1\n");
-
-//    ln = regex_replace(ln, std::regex(R"(:=)"), ":§");
-//    ln = regex_replace(ln, std::regex(R"(==)"), "§§");
-//    ln = regex_replace(ln, std::regex(R"(=)"), "==");
-//    ln = regex_replace(ln, std::regex(R"(§)"), "=");
-
-    r = R"(≥|≤|≠|==|:=|\+|-|\*|\/)";
-    ln = regex_replace(ln, r, " $0 ");
-    
-    r = R"(([≥≤≠=:\+|-|\*|\/]) +- +)";
-    ln = regex_replace(ln, r, "$1 -");
-    
-    r = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
-    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
-        singleton->nestingLevel++;
-        singleton->scope = Singleton::Scope::Local;
-    }
-    
-    r = std::regex(R"(\b(?:END|UNTIL)\b)", std::regex_constants::icase);
-    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
-        singleton->nestingLevel--;
-        if (0 == singleton->nestingLevel) {
-            singleton->scope = Singleton::Scope::Global;
-        }
-    }
-    
-    
-    
-    if (Singleton::Scope::Local == singleton->scope) {
-//        ln = regex_replace(ln, std::regex(R"(THEN (.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
-//        ln = regex_replace(ln, std::regex(R"(;(.+;))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
-        if (!regex_search(ln, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)"))) {
-            lpad(ln, ' ', singleton->nestingLevel * 2);
-        } else {
-            lpad(ln, ' ', (singleton->nestingLevel - 1) * 2);
-        }
-        ln = regex_replace(ln, std::regex(R"(\(\s*\))"), "");
-    }
-//    
-    strings.restoreStrings(ln);
-    singleton->comments.restoreComment(ln);
-    rtrim(ln);
-    
-    if (Singleton::Scope::Global == singleton->scope) {
-        ln = regex_replace(ln, std::regex(R"(END;)"), "$0\n");
-        
-//        r = R"(^([A-Za-z]\w*)\(([\w,]*)\);?$)";
-//        if (regex_search(ln, m, r)) {
-//            if (ln.back() != ';') ln.insert(0, "\n");
-//        }
-    }
-    
-    ln = regex_replace(ln, std::regex(R"(// *-+$)"), "// MARK: -");
-    ln = regex_replace(ln, std::regex(R"( +(// *.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
-    
-    ln = regex_replace(ln, std::regex(R"(^ *(\[|\d))"), lpad(' ', (singleton->nestingLevel + 1) * 2) + "$1");
-    
-    ln += "\n";
-}
 
 // MARK: - Command Line
 void version(void) {
@@ -583,7 +549,7 @@ int main(int argc, char **argv) {
     std::locale commaLocale(std::locale::classic(), new comma_numpunct);
     std::cout.imbue(commaLocale);
     
-    std::cout << "Reduction of " << (original_size - new_size) * 100 / original_size;
+    std::cout << "Reformatting reduced file size by " << (original_size - new_size) * 100 / original_size;
     std::cout << "% or " << original_size - new_size << " bytes.\n";
     
     std::cout << "UTF-16LE file '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
