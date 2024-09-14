@@ -205,7 +205,7 @@ std::string base10ToBase32(unsigned int num) {
     return result;
 }
 
-// MARK: - Pre-Processing...
+// MARK: - Formatting And Writing
 
 void reformatLine(std::string &ln, std::ofstream &outfile) {
     std::regex r;
@@ -330,12 +330,7 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     ln += "\n";
 }
 
-void processLine(const std::string& str, std::ofstream& outfile) {
-    Singleton& singleton = *Singleton::shared();
-    std::string ln = str;
-    
-    reformatLine(ln, outfile);
-    
+void writeUTF16Line(const std::string& ln, std::ofstream& outfile) {
     for ( int n = 0; n < ln.length(); n++) {
         uint8_t *ascii = (uint8_t *)&ln.at(n);
         if (ln.at(n) == '\r') continue;
@@ -356,20 +351,27 @@ void processLine(const std::string& str, std::ofstream& outfile) {
             outfile.put('\0');
         }
     }
+}
+
+void formatAndWriteLine(std::string& str, std::ofstream& outfile) {
+    Singleton& singleton = *Singleton::shared();
+    
+    reformatLine(str, outfile);
+    writeUTF16Line(str, outfile);
     
     singleton.incrementLineNumber();
 }
 
-void processLines(std::istringstream &iss, std::ofstream &outfile)
+void processAndWriteLines(std::istringstream &iss, std::ofstream &outfile)
 {
-    std::string s;
+    std::string str;
     
-    while(getline(iss, s)) {
-        processLine(s, outfile);
+    while(getline(iss, str)) {
+        formatAndWriteLine(str, outfile);
     }
 }
 
-void process(std::ifstream &infile, std::ofstream &outfile)
+void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
 {
     if (!isUTF16le(infile)) {
         infile.close();
@@ -411,7 +413,7 @@ void process(std::ifstream &infile, std::ofstream &outfile)
     
     std::istringstream iss;
     iss.str(str);
-    processLines(iss, outfile);
+    processAndWriteLines(iss, outfile);
 }
 
 
@@ -523,7 +525,7 @@ int main(int argc, char **argv) {
     
     std::string str;
 
-    process( infile, outfile );
+    convertAndFormatFile( infile, outfile );
     
     // Stop measuring time and calculate the elapsed time.
     clock_gettime(CLOCK_MONOTONIC, &end);
