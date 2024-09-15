@@ -22,7 +22,7 @@
  SOFTWARE.
  */
 
-#include "Singleton.hpp"
+#include "singleton.hpp"
 
 // Define the static Singleton pointer
 Singleton* Singleton::_shared = NULL;

@@ -22,7 +22,7 @@
  SOFTWARE.
  */
 
-#include "Strings.hpp"
+#include "strings.hpp"
 #include <regex>
 
 using namespace ppl;

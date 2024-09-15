@@ -22,8 +22,8 @@
  SOFTWARE.
  */
 
-#include "Preprocessor.hpp"
-#include "Singleton.hpp"
+#include "preprocessor.hpp"
+#include "singleton.hpp"
 #include "common.hpp"
 
 #include <regex>

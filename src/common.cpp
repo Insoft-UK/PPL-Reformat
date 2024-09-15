@@ -23,7 +23,7 @@
  */
 
 #include "common.hpp"
-#include "Singleton.hpp"
+#include "singleton.hpp"
 
 #include <sstream>
 #include <algorithm>

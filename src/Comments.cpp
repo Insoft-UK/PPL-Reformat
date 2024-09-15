@@ -22,7 +22,7 @@
  SOFTWARE.
  */
 
-#include "Comments.hpp"
+#include "comments.hpp"
 #include "common.hpp"
 
 #include <iostream>
