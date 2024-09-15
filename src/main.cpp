@@ -407,7 +407,7 @@ void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
     str = regex_replace(str, r, "$0\n");
     
     // Make sure all `LOCAL` are on seperate lines.
-    r = R"(\bLOCAL\b)";
+    r = R"(\b(LOCAL|CASE|IF)\b)";
     str = regex_replace(str, r, "\n$0");
 
     r = R"(\bEND;)";
