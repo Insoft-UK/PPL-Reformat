@@ -423,7 +423,7 @@ void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
 // MARK: - Command Line
 void version(void) {
     std::cout 
-    << "P+ Pre-Processor v"
+    << "PPL Reformater v"
     << (unsigned)__BUILD_NUMBER / 100000 << "."
     << (unsigned)__BUILD_NUMBER / 10000 % 10 << "."
     << (unsigned)__BUILD_NUMBER / 1000 % 10 << "."
