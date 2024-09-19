@@ -28,18 +28,17 @@
 #include <iostream>
 
 namespace ppl {
-
-class Comments {
-private:
-    std::string _preservedComment;
-public:
-    bool verbose = false;
-
-    void preserveComment(const std::string &str);
-    std::string& removeComment(std::string &str);
-    std::string& restoreComment(std::string &str);
-};
-
+    class Comments {
+    public:
+        bool verbose = false;
+        
+        void preserveComment(const std::string &str);
+        std::string& removeComment(std::string &str);
+        std::string& restoreComment(std::string &str);
+        
+    private:
+        std::string _preservedComment;
+    };
 }
 
 #endif /* COMMENTS_HPP */

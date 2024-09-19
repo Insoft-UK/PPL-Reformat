@@ -29,18 +29,17 @@
 #include <list>
 
 namespace ppl {
-
-class Strings {
-private:
-    std::list<std::string> _preservedStrings;
-    std::string _original;
-public:
-    Strings() {
-    }
-    void preserveStrings(const std::string &str);
-    void restoreStrings(std::string &altered);
-};
-
+    class Strings {
+    public:
+        Strings() {
+        }
+        void preserveStrings(const std::string &str);
+        void restoreStrings(std::string &altered);
+        
+    private:
+        std::list<std::string> _preservedStrings;
+        std::string _original;
+    };
 }
 
 #endif /* STRINGS_HPP */
