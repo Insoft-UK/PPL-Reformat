@@ -263,8 +263,6 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     ln = regex_replace(ln, std::regex(R"(<>)"), "≠");
 
     ln = regex_replace(ln, std::regex(R"(,)"), ", ");
-    ln = regex_replace(ln, std::regex(R"(\{)"), "{ ");
-    ln = regex_replace(ln, std::regex(R"(\})"), " }");
     ln = regex_replace(ln, std::regex(R"(^ +(\} *;))"), "$1\n");
     
     /*
@@ -283,7 +281,7 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     r = R"(≥|≤|≠|=|:=|\+|-|\*|\/)";
     ln = regex_replace(ln, r, " $0 ");
     
-    r = R"(([≥≤≠=:\+|-|\*|\/]) +- +)";
+    r = R"(([≥≤≠=\+|\-|\*|\/]) +- +)";
     ln = regex_replace(ln, r, "$1 -");
     
     if (!regex_search(ln, std::regex(R"(LOCAL [A-Za-z]\w* = )"))) {
@@ -308,7 +306,7 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     
     
     if (Singleton::Scope::Local == singleton->scope) {
-        if (!regex_search(ln, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)"))) {
+        if (!regex_search(ln, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase))) {
             lpad(ln, ' ', singleton->nestingLevel * 2);
         } else {
             lpad(ln, ' ', (singleton->nestingLevel - 1) * 2);
@@ -403,14 +401,14 @@ void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
      is correctly processed, as it separates the conditional or loop structure from the subsequent
      statements for proper handling.
      */
-    r = R"(\b(THEN|DO|REPEAT)\b)";
+    r = std::regex(R"(\b(THEN|DO|REPEAT)\b)", std::regex_constants::icase);
     str = regex_replace(str, r, "$0\n");
     
-    // Make sure all `LOCAL` are on seperate lines.
-    r = R"(\b(LOCAL|CASE|IF)\b)";
+    // Make sure all `LOCAL` & `CONST` are on seperate lines.
+    r = std::regex(R"(\b(LOCAL|CONST)\b)", std::regex_constants::icase);
     str = regex_replace(str, r, "\n$0");
 
-    r = R"(\bEND;)";
+    r = std::regex(R"(\bEND;)", std::regex_constants::icase);
     str = regex_replace(str, r, "\n$0");
     
     std::istringstream iss;

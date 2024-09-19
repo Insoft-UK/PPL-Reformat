@@ -47,7 +47,7 @@ public:
     Scope scope = Scope::Global;
     
     Comments comments;
-
+    
     
     int nestingLevel = 0;
     
