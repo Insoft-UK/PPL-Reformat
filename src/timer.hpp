@@ -22,22 +22,26 @@
  SOFTWARE.
  */
 
-
-#ifndef STRINGS_HPP
-#define STRINGS_HPP
+#ifndef TIMER_HPP
+#define TIMER_HPP
 
 #include <iostream>
-#include <list>
+#include <chrono>
+#include <thread>
 
-namespace ppl {
-    class Strings {
-    public:
-        void preserveStrings(const std::string& str);
-        void blankOutStrings(std::string& str);
-        void restoreStrings(std::string& str);
-    private:
-        std::list<std::string> _preservedStrings;
-    };
-}
+class Timer {
+public:
+    Timer() : start_time_point(std::chrono::high_resolution_clock::now()) {}
 
-#endif /* STRINGS_HPP */
+    // Method to stop the timer and get elapsed time in nanoseconds
+    long long elapsed() {
+        auto end_time_point = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_point - start_time_point);
+        return duration.count();
+    }
+
+private:
+    std::chrono::high_resolution_clock::time_point start_time_point;
+};
+
+#endif /* TIMER_HPP */

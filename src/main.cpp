@@ -38,6 +38,7 @@
 #include "strings.hpp"
 
 #include "build.h"
+#include "timer.hpp"
 
 using namespace ppl;
 
@@ -47,10 +48,10 @@ static Strings strings = Strings();
 
 
 void terminator() {
-  std::cout << MessageType::Error << "An internal preprocessing problem occurred. Please review the syntax before this point.\n";
-  exit(-1);
+    std::cout << MessageType::Error << "An internal preprocessing problem occurred. Please review the syntax before this point.\n";
+    exit(-1);
 }
- 
+
 void (*old_terminate)() = std::set_terminate(terminator);
 
 
@@ -59,7 +60,7 @@ void (*old_terminate)() = std::set_terminate(terminator);
 
 
 
-uint32_t utf8_to_utf16(const char *utf8) {
+uint32_t utf8_to_utf16(const char* utf8) {
     uint8_t *utf8_char = (uint8_t *)utf8;
     uint16_t utf16_char = *utf8_char;
     
@@ -133,7 +134,7 @@ T swap_endian(T u)
 }
 
 // TODO: .hpprgrm file format detection and handling.
-bool isHPPrgrmFileFormat(std::ifstream &infile)
+bool isHPPrgrmFileFormat(std::ifstream& infile)
 {
     uint32_t u32;
     infile.read((char *)&u32, sizeof(uint32_t));
@@ -178,10 +179,10 @@ bool isUTF16le(std::ifstream &infile)
 std::string removeWhitespaceAroundOperators(const std::string& str) {
     // Regular expression pattern to match spaces around the specified operators
     // Operators: {}[]()≤≥≠<>=*/+-▶.,;:!^
-    std::regex r(R"(\s*([{}[\]()≤≥≠<>=*/+\-▶.,;:!^])\s*)");
+    std::regex re(R"(\s*([{}[\]()≤≥≠<>=*/+\-▶.,;:!^])\s*)");
 
     // Replace matches with the operator and no surrounding spaces
-    std::string result = std::regex_replace(str, r, "$1");
+    std::string result = std::regex_replace(str, re, "$1");
 
     return result;
 }
@@ -209,9 +210,8 @@ std::string base10ToBase32(unsigned int num) {
 
 // MARK: - Formatting And Writing
 
-void reformatLine(std::string &ln, std::ofstream &outfile) {
-    std::regex r;
-    std::smatch m;
+void reformatLine(std::string& ln, std::ofstream& outfile) {
+    std::regex re;
     std::ifstream infile;
     static std::string indentation("");
     Singleton *singleton = Singleton::shared();
@@ -243,6 +243,7 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
      be restored to their original state.
      */
     strings.preserveStrings(ln);
+    strings.blankOutStrings(ln);
 
     // Remove any leading white spaces before or after.
     trim(ln);
@@ -278,11 +279,11 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     ln = regex_replace(ln, std::regex(R"(==)"), "=");
 
     // Ensuring that standalone `≥`, `≤`, `≠`, `=`, `:=`, `+`, `-`, `*` and `/` have surrounding whitespace.
-    r = R"(≥|≤|≠|=|:=|\+|-|\*|\/)";
-    ln = regex_replace(ln, r, " $0 ");
+    re = R"(≥|≤|≠|=|:=|\+|-|\*|\/)";
+    ln = regex_replace(ln, re, " $0 ");
     
-    r = R"(([≥≤≠=\+|\-|\*|\/]) +- +)";
-    ln = regex_replace(ln, r, "$1 -");
+    re = R"(([≥≤≠=\+|\-|\*|\/]) +- +)";
+    ln = regex_replace(ln, re, "$1 -");
     
     if (!regex_search(ln, std::regex(R"(LOCAL [A-Za-z]\w* = )"))) {
         // We can now safely convert `=` to `==` without affecting other operators.
@@ -290,14 +291,14 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     }
     
     
-    r = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
-    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
+    re = std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase);
+    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), re); it != std::sregex_iterator(); ++it) {
         singleton->nestingLevel++;
         singleton->scope = Singleton::Scope::Local;
     }
     
-    r = std::regex(R"(\b(?:END|UNTIL)\b)", std::regex_constants::icase);
-    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), r); it != std::sregex_iterator(); ++it) {
+    re = std::regex(R"(\b(?:END|UNTIL)\b)", std::regex_constants::icase);
+    for(auto it = std::sregex_iterator(ln.begin(), ln.end(), re); it != std::sregex_iterator(); ++it) {
         singleton->nestingLevel--;
         if (0 == singleton->nestingLevel) {
             singleton->scope = Singleton::Scope::Global;
@@ -307,9 +308,9 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     
     if (Singleton::Scope::Local == singleton->scope) {
         if (!regex_search(ln, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT)\b)", std::regex_constants::icase))) {
-            lpad(ln, ' ', singleton->nestingLevel * 2);
+            ln.insert(0, std::string(Singleton::shared()->nestingLevel * INDENT_WIDTH, ' '));
         } else {
-            lpad(ln, ' ', (singleton->nestingLevel - 1) * 2);
+            ln.insert(0, std::string((Singleton::shared()->nestingLevel - 1) * INDENT_WIDTH, ' '));
         }
         ln = regex_replace(ln, std::regex(R"(\(\s*\))"), "");
     }
@@ -323,9 +324,8 @@ void reformatLine(std::string &ln, std::ofstream &outfile) {
     }
     
     ln = regex_replace(ln, std::regex(R"(// *-+$)"), "// MARK: -");
-    ln = regex_replace(ln, std::regex(R"( +(// *.+))"), "\n" + lpad(' ', singleton->nestingLevel * 2) + "$1");
-    
-    ln = regex_replace(ln, std::regex(R"(^ *(\[|\d))"), lpad(' ', (singleton->nestingLevel + 1) * 2) + "$1");
+    ln = regex_replace(ln, std::regex(R"( +(// *.+))"), "\n" + std::string(Singleton::shared()->nestingLevel * INDENT_WIDTH, ' ') + "$1");
+    ln = regex_replace(ln, std::regex(R"(^ *(\[|\d))"), std::string((Singleton::shared()->nestingLevel + 1) * INDENT_WIDTH, ' ') + "$1");
     
     ln += "\n";
 }
@@ -362,7 +362,7 @@ void formatAndWriteLine(std::string& str, std::ofstream& outfile) {
     singleton.incrementLineNumber();
 }
 
-void processAndWriteLines(std::istringstream &iss, std::ofstream &outfile)
+void processAndWriteLines(std::istringstream& iss, std::ofstream& outfile)
 {
     std::string str;
     
@@ -371,7 +371,7 @@ void processAndWriteLines(std::istringstream &iss, std::ofstream &outfile)
     }
 }
 
-void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
+void convertAndFormatFile(std::ifstream& infile, std::ofstream& outfile)
 {
     if (!isUTF16le(infile)) {
         infile.close();
@@ -393,7 +393,7 @@ void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
     uint16_t *utf16_str = (uint16_t *)str.c_str();
     str = utf16_to_utf8(utf16_str, str.size() / 2);
     
-    std::regex r;
+    std::regex re;
 
     /*
      Pre-correct any `THEN`, `DO` or `REPEAT` statements that are followed by other statements on the
@@ -401,15 +401,15 @@ void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
      is correctly processed, as it separates the conditional or loop structure from the subsequent
      statements for proper handling.
      */
-    r = std::regex(R"(\b(THEN|DO|REPEAT)\b)", std::regex_constants::icase);
-    str = regex_replace(str, r, "$0\n");
+    re = std::regex(R"(\b(THEN|DO|REPEAT)\b)", std::regex_constants::icase);
+    str = regex_replace(str, re, "$0\n");
     
     // Make sure all `LOCAL` & `CONST` are on seperate lines.
-    r = std::regex(R"(\b(LOCAL|CONST)\b)", std::regex_constants::icase);
-    str = regex_replace(str, r, "\n$0");
+    re = std::regex(R"(\b(LOCAL|CONST)\b)", std::regex_constants::icase);
+    str = regex_replace(str, re, "\n$0");
 
-    r = std::regex(R"(\bEND;)", std::regex_constants::icase);
-    str = regex_replace(str, r, "\n$0");
+    re = std::regex(R"(\bEND;)", std::regex_constants::icase);
+    str = regex_replace(str, re, "\n$0");
     
     std::istringstream iss;
     iss.str(str);
@@ -419,32 +419,82 @@ void convertAndFormatFile(std::ifstream &infile, std::ofstream &outfile)
 
 
 // MARK: - Command Line
-void version(void) {
-    std::cout 
-    << "PPL Reformater v"
-    << (unsigned)__BUILD_NUMBER / 100000 << "."
-    << (unsigned)__BUILD_NUMBER / 10000 % 10 << "."
-    << (unsigned)__BUILD_NUMBER / 1000 % 10 << "."
-    << std::setfill('0') << std::setw(3) << (unsigned)__BUILD_NUMBER % 1000
-    << "\n";
+
+/*
+ The decimalToBase24 function converts a given
+ base 10 integer into its base 24 representation using a
+ specific set of characters. The character set is
+ comprised of the following 24 symbols:
+
+     •    Numbers: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+     •    Letters: C, D, F, H, J, K, M, N, R, U, V, W, X, Y
+     
+ Character Selection:
+ The choice of characters was made to avoid confusion
+ with common alphanumeric representations, ensuring
+ that each character is visually distinct and easily
+ recognizable. This set excludes characters that closely
+ resemble each other or numerical digits, promoting
+ clarity in representation.
+ */
+static std::string decimalToBase24(int num) {
+    if (num == 0) {
+        return "C";
+    }
+
+    const std::string base24Chars = "0123456789CDFHJKMNRUVWXY";
+    std::string base24;
+
+    while (num > 0) {
+        int remainder = num % 24;
+        base24 = base24Chars[remainder] + base24; // Prepend character
+        num /= 24; // Integer division
+    }
+
+    return base24;
 }
 
-void error(void) {
-    printf("pplref: try 'pplref --help' for more information\n");
+static std::string getBuildCode(void) {
+    std::string str;
+    int majorVersionNumber = BUILD_NUMBER / 100000;
+    str = std::to_string(majorVersionNumber) + decimalToBase24(BUILD_NUMBER - majorVersionNumber * 100000);
+    return str;
+}
+
+void help(void)
+{
+    int rev = BUILD_NUMBER / 1000 % 10;
+    
+    std::cout << "Copyright (C) 2024 Insoft. All rights reserved.\n";
+    std::cout << "Insoft PPL Reformat version, " << BUILD_NUMBER / 100000 << "." << BUILD_NUMBER / 10000 % 10 << (rev ? "." + std::to_string(rev) : "")
+    << " (BUILD " << getBuildCode() << "-" << decimalToBase24(BUILD_DATE) << ")\n\n";
+    std::cout << "Usage: pplref <input-file> \n\n";
+    std::cout << "Additional Commands:\n";
+    std::cout << "  pplref {-version | -help}\n";
+    std::cout << "    -version                 Display the version information.\n";
+    std::cout << "    -help                    Show this help message.\n";
+}
+
+void version(void) {
+    std::cout << "Copyright (C) 2024 Insoft. All rights reserved.\n";
+    std::cout << "Insoft PPL Reformat version, " << BUILD_NUMBER / 100000 << "." << BUILD_NUMBER / 10000 % 10 << "." << BUILD_NUMBER / 1000 % 10
+    << " (BUILD " << getBuildCode() << ")\n";
+    std::cout << "Built on: " << CURRENT_DATE << "\n";
+    std::cout << "Licence: MIT License\n\n";
+    std::cout << "For more information, visit: http://www.insoft.uk\n";
+}
+
+void error(void)
+{
+    std::cout << "pplref: try 'pplref -help' for more information\n";
+    exit(0);
 }
 
 void info(void) {
-    std::cout << "Copyright (c) 2024 Insoft. All rights reserved\n";
-    int rev = (unsigned)__BUILD_NUMBER / 1000 % 10;
-    std::cout << "PPL Reformat v" << (unsigned)__BUILD_NUMBER / 100000 << "." << (unsigned)__BUILD_NUMBER / 10000 % 10 << (rev ? "." + std::to_string(rev) : "") << " BUILD " << std::setfill('0') << std::setw(3) << __BUILD_NUMBER % 1000 << "\n\n";
-}
-
-void usage(void) {
-    info();
-    std::cout << "usage: pplref in-file\n\n";
-    std::cout << " -v, --verbose     display detailed processing information\n";
-    std::cout << " -h, --help        help.\n";
-    std::cout << " --version         displays the full version number.\n";
+    std::cout << "Copyright (c) 2024 Insoft. All rights reserved.\n";
+    int rev = BUILD_NUMBER / 1000 % 10;
+    std::cout << "Insoft PPL Reformat version, " << BUILD_NUMBER / 100000 << "." << BUILD_NUMBER / 10000 % 10 << (rev ? "." + std::to_string(rev) : "")
+    << " (BUILD " << getBuildCode() << "-" << decimalToBase24(BUILD_DATE) << ")\n\n";
 }
 
 // Custom facet to use comma as the thousands separator
@@ -473,11 +523,9 @@ int main(int argc, char **argv) {
         std::string args(argv[n]);
         
         if ( args == "--help" ) {
-            usage();
+            help();
             exit(102);
         }
-        
-        
         
         if ( strcmp( argv[n], "--version" ) == 0 ) {
             version();
@@ -485,7 +533,7 @@ int main(int argc, char **argv) {
         }
         
         in_filename = argv[n];
-        std::regex r(R"(.\w*$)");
+        std::regex re(R"(.\w*$)");
         std::smatch extension;
     }
     
@@ -520,19 +568,17 @@ int main(int argc, char **argv) {
     outfile.put(0xFE);
     
     // Start measuring time
-    struct timespec start, end;
-    clock_gettime(CLOCK_MONOTONIC, &start);
+    Timer timer;
     
     std::string str;
 
     convertAndFormatFile( infile, outfile );
     
     // Stop measuring time and calculate the elapsed time.
-    clock_gettime(CLOCK_MONOTONIC, &end);
+    long long elapsed_time = timer.elapsed();
     
     // Display elasps time in secononds.
-    double delta_us = (end.tv_sec - start.tv_sec) * 1000000 + (end.tv_nsec - start.tv_nsec) / 1000;
-    printf("Completed in %.3f seconds.\n", delta_us * 1e-6);
+    std::cout << "Completed in " << std::fixed << std::setprecision(2) << elapsed_time / 1e9 << " seconds\n";
     
     infile.close();
     outfile.close();
@@ -551,11 +597,15 @@ int main(int argc, char **argv) {
     std::locale commaLocale(std::locale::classic(), new comma_numpunct);
     std::cout.imbue(commaLocale);
     
-    std::cout << "Reformatting reduced file size by " << (original_size - new_size) * 100 / original_size;
-    std::cout << "% or " << original_size - new_size << " bytes.\n";
-    
+    if (original_size > new_size) {
+        std::cout << "Reformatting reduced file size by " << (original_size - new_size) * 100 / original_size;
+        std::cout << "% or " << original_size - new_size << " bytes.\n";
+    }
+    else {
+        std::cout << "Reformatting increased file size by " << (new_size - original_size) * 100 / new_size;
+        std::cout << "% or " << new_size - original_size << " bytes.\n";
+    }
     std::cout << "UTF-16LE file '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
-    
     
     return 0;
 }
