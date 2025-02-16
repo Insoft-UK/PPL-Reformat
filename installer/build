@@ -14,6 +14,9 @@ pkgbuild --root package-root \
 IDENTITY=$(security find-identity -v -p basic | grep "Developer ID Installer" | awk '{print $2}')
 productsign --sign "$IDENTITY" pplref.pkg pplref-signed.pkg
 
+rm -rf pplref.pkg
+mv pplref-signed.pkg pplref.pkg
+
 read -p "Press Enter to exit!"
 
 # Close the Terminal window
