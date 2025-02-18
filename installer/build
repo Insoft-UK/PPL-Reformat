@@ -15,7 +15,7 @@ IDENTITY=$(security find-identity -v -p basic | grep "Developer ID Installer" | 
 productsign --sign "$IDENTITY" pplref.pkg pplref-signed.pkg
 
 rm -rf pplref.pkg
-mv pplref-signed.pkg pplref.pkg
+mv pplref-signed.pkg PPL-Reformat.pkg
 
 read -p "Press Enter to exit!"
 
