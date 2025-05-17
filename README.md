@@ -5,3 +5,6 @@ Reformating your code enforce a consistent coding style throughout your project,
 
 > [!NOTE]
 The PPL file must be in UTF-16LE format, and at this time, .hpprgrm files with header and footer are not supported—only raw code is accepted currently.
+
+>[!WARNING]
+Future updates will no longer be uploaded to this GitHub repository. Instead, all future updates will be available at the <a href="https://github.com/Insoft-UK/PrimeSDK">PrimeSDK</a> repository.
