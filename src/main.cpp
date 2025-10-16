@@ -608,7 +608,7 @@ std::string reformatPrgm(std::ifstream& infile)
     std::string str;
     std::wstring wstr;
     
-    wstr = utf::read_utf16(infile);
+    wstr = utf::read(infile);
     if (wstr.empty()) {
         char c;
         while (!infile.eof()) {
