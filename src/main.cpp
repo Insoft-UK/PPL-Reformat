@@ -1,26 +1,24 @@
-/*
- The MIT License (MIT)
- 
- Copyright (c) 2024 Insoft. All rights reserved.
- 
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
- 
- The above copyright notice and this permission notice shall be included in all
- copies or substantial portions of the Software.
- 
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- SOFTWARE.
- */
+// The MIT License (MIT)
+// 
+// Copyright (c) 2024-2025 Insoft.
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 #include <iostream>
 #include <fstream>
@@ -619,7 +617,7 @@ std::string reformatPrgm(std::ifstream& infile)
             infile.peek();
         }
     } else {
-        str = utf::to_utf8(wstr);
+        str = utf::utf8(wstr);
     }
     
     std::regex re;
@@ -743,8 +741,12 @@ int main(int argc, char **argv) {
     
     if (path.extension().empty()) {
         path.append(".prgm");
+    } else if (path.extension() != ".prgm") {
+        error();
+        return 0;
     }
-    if (!std::filesystem::exists(path) || path.extension() == ".hpprgm") {
+    
+    if (!std::filesystem::exists(path)) {
         error();
         return 0;
     }
@@ -767,7 +769,7 @@ int main(int argc, char **argv) {
         return 0;
     }
     str = reformatPrgm(infile);
-    utf::save_as_utf16(out_filename, str);
+    utf::save(out_filename, utf::utf16(str));
     
     // Stop measuring time and calculate the elapsed time.
     long long elapsed_time = timer.elapsed();
