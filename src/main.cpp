@@ -28,7 +28,7 @@
 #include <iomanip>
 #include <unordered_set>
 #include <sys/time.h>
-#include "../../PrimePlus/src/utf.hpp"
+#include "utf.hpp"
 
 #include "singleton.hpp"
 #include "common.hpp"
@@ -118,27 +118,6 @@ std::string removeWhitespaceAroundOperators(const std::string& str) {
 
     // Replace matches with the operator and no surrounding spaces
     std::string result = std::regex_replace(str, re, "$1");
-
-    return result;
-}
-
-std::string base10ToBase32(unsigned int num) {
-    if (num == 0) {
-        return "0";  // Edge case: if the number is 0, return "0"
-    }
-
-    std::string result;
-    const char digits[] = "0123456789ABCDEFGHIJKLMNabcdefgh";  // Base-32 digits
-    
-    // Keep dividing the number by 32 and store the remainders
-    while (num > 0) {
-        int remainder = num % 32;  // Get the current base-32 digit
-        result += digits[remainder];  // Add the corresponding character
-        num /= 32;  // Reduce the number
-    }
-
-    // The digits are accumulated in reverse order, so reverse the result string
-    std::reverse(result.begin(), result.end());
 
     return result;
 }
@@ -562,27 +541,8 @@ std::string reformatLine(const std::string& str) {
     singleton->comments.restoreComment(result);
     rtrim(result);
     
-//    if (Singleton::shared()->nestingLevel == 1) {
-//        result = regex_replace(result, std::regex(R"(END;)"), "$0\n");
-//    }
-    
-//    if (Singleton::shared()->nestingLevel == 0 && result != "END;") {
-//        result = result.insert(0, "\n");
-//    }
-    
     result = regex_replace(result, std::regex(R"(^ *([\[\d\-\#]))"), std::string((Singleton::shared()->nestingLevel + 1) * INDENT_WIDTH, ' ') + "$1");
 
-//    if (result.length()) {
-//        if (result.at(result.length() - 1) == ';') {
-//            result += '\n';
-//        }
-//    }
-//        result = regex_replace(result, std::regex(R"(;)"), "$0\n");
-//    trim(result);
-//    if (!result.empty())
-    
-//    result = result.insert(0, std::string((Singleton::shared()->nestingLevel - 1) * INDENT_WIDTH, ' '));
-    
     result += "\n";
     return result;
 }
@@ -653,22 +613,24 @@ std::string reformatPrgm(std::ifstream& infile)
 
 void help(void)
 {
-    std::cout << "Copyright (C) 2024-" << YEAR << " Insoft. All rights reserved.\n";
-    std::cout << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n";
-    std::cout << "\n";
-    std::cout << "Usage: " << COMMAND_NAME << " <input-file>\n\n";
-    std::cout << "Additional Commands:\n";
-    std::cout << "  " << COMMAND_NAME << " {-version | -help}\n";
-    std::cout << "    -version                 Display the version information.\n";
-    std::cout << "    -help                    Show this help message.\n";
+    std::cout
+    << "Copyright (C) 2024-" << YEAR << " Insoft.\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "\n"
+    << "Usage: " << COMMAND_NAME << " <input-file>\n\n"
+    << "Additional Commands:\n"
+    << "  " << COMMAND_NAME << " {-version | -help}\n"
+    << "    -version                 Display the version information.\n"
+    << "    -help                    Show this help message.\n";
 }
 
 void version(void) {
-    std::cout << "Copyright (C) 2024 Insoft. All rights reserved.\n";
-    std::cout << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n";
-    std::cout << "Built on: " << DATE << "\n";
-    std::cout << "Licence: MIT License\n\n";
-    std::cout << "For more information, visit: http://www.insoft.uk\n";
+    std::cout
+    << "Copyright (C) 2024 Insoft.\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Built on: " << DATE << "\n"
+    << "Licence: MIT License\n\n"
+    << "For more information, visit: http://www.insoft.uk\n";
 }
 
 void error(void) {
@@ -677,8 +639,9 @@ void error(void) {
 }
 
 void info(void) {
-    std::cout << "Copyright (c) 2024 Insoft. All rights reserved.\n";
-    std::cout << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n\n";
+    std::cout
+    << "Copyright (c) 2024 Insoft.\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n\n";
 }
 
 
@@ -731,7 +694,7 @@ int main(int argc, char **argv) {
         std::smatch extension;
     }
     
-    info();
+    
     
     if (std::filesystem::path(in_filename).parent_path().empty()) {
         in_filename = in_filename.insert(0, "./");
@@ -769,8 +732,14 @@ int main(int argc, char **argv) {
         return 0;
     }
     str = reformatPrgm(infile);
-    utf::save(out_filename, utf::utf16(str));
+    if (out_filename == "-" || out_filename == "/dev/stdout") {
+        std::cout << str;
+        return 0;
+    }
     
+    utf::save(out_filename, utf::utf16(str));
+    info();
+
     // Stop measuring time and calculate the elapsed time.
     long long elapsed_time = timer.elapsed();
     
