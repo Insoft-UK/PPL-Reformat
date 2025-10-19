@@ -639,9 +639,24 @@ void error(void) {
 }
 
 void info(void) {
+    using namespace std;
     std::cout
-    << "Copyright (c) 2024 Insoft.\n"
-    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n\n";
+    << "          ***********     \n"
+    << "        ************      \n"
+    << "      ************        \n"
+    << "    ************  **      \n"
+    << "  ************  ******    \n"
+    << "************  **********  \n"
+    << "**********    ************\n"
+    << "************    **********\n"
+    << "  **********  ************\n"
+    << "    ******  ************  \n"
+    << "      **  ************    \n"
+    << "        ************      \n"
+    << "      ************        \n"
+    << "    ************          \n\n"
+    << "Copyright (C) 2024-" << YEAR << " Insoft.\n"
+    << "Insoft " << NAME << "\n\n";
 }
 
 
@@ -749,12 +764,12 @@ int main(int argc, char **argv) {
     infile.close();
     
     if (hasErrors() == true) {
-        std::cout << "ERRORS!\n";
+        std::cout << "❌ ERRORS!\n";
         remove(out_filename.c_str());
         return 0;
     }
     
-    std::cout << "File '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
+    std::cout << "✅ File '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
     
     return 0;
 }
