@@ -528,7 +528,7 @@ std::string reformatLine(const std::string& str) {
     }
     
     
-    if (Singleton::Scope::Local == singleton->scope) {
+    if (singleton->scope == Singleton::Scope::Local) {
         if (!regex_search(result, std::regex(R"(\b(?:BEGIN|IF|CASE|FOR|WHILE|REPEAT|IFERR|ELSE)\b)", std::regex_constants::icase))) {
             result.insert(0, std::string(Singleton::shared()->nestingLevel * INDENT_WIDTH, ' '));
         } else {

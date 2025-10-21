@@ -43,20 +43,20 @@ std::ostream& operator<<(std::ostream& os, MessageType type) {
 
     switch (type) {
         case MessageType::Error:
-            os << " error: ";
+            os << "❌ error: ";
             _failed = true;
             break;
 
         case MessageType::Warning:
-            os << " warning: ";
+            os << "⚠️ warning: ";
             break;
             
         case MessageType::Verbose:
-            os << " : ";
+            os << "📣 : ";
             break;
             
         case MessageType::Deprecated:
-            os << " deprecated: ";
+            os << "🪦 deprecated: ";
             break;
 
         default:
