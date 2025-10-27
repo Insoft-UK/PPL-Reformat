@@ -613,7 +613,7 @@ std::string reformatPrgm(std::ifstream& infile)
 
 void help(void)
 {
-    std::cout
+    std::cerr
     << "Copyright (C) 2024-" << YEAR << " Insoft.\n"
     << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
     << "\n"
@@ -625,7 +625,7 @@ void help(void)
 }
 
 void version(void) {
-    std::cout
+    std::cerr
     << "Copyright (C) 2024 Insoft.\n"
     << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
     << "Built on: " << DATE << "\n"
@@ -634,13 +634,13 @@ void version(void) {
 }
 
 void error(void) {
-    std::cout << COMMAND_NAME << ": try '" << COMMAND_NAME << " --help' for more information\n";
+    std::cerr << COMMAND_NAME << ": try '" << COMMAND_NAME << " --help' for more information\n";
     exit(0);
 }
 
 void info(void) {
     using namespace std;
-    std::cout
+    std::cerr
     << "          ***********     \n"
     << "        ************      \n"
     << "      ************        \n"
@@ -709,7 +709,7 @@ int main(int argc, char **argv) {
         std::smatch extension;
     }
     
-    
+    info();
     
     if (std::filesystem::path(in_filename).parent_path().empty()) {
         in_filename = in_filename.insert(0, "./");
@@ -733,7 +733,6 @@ int main(int argc, char **argv) {
         out_filename = path.parent_path().string() + "/" + path.stem().string() + "-ref.prgm";
     }
 
-    
     // Start measuring time
     Timer timer;
     
@@ -746,30 +745,29 @@ int main(int argc, char **argv) {
         error();
         return 0;
     }
-    str = reformatPrgm(infile);
-    if (out_filename == "-" || out_filename == "/dev/stdout") {
-        std::cout << str;
-        return 0;
-    }
     
-    utf::save(out_filename, utf::utf16(str));
-    info();
-
+    str = reformatPrgm(infile);
     // Stop measuring time and calculate the elapsed time.
     long long elapsed_time = timer.elapsed();
-    
+
+    if (out_filename == "/dev/stdout") {
+        std::cout << str;
+    } else {
+        utf::save(out_filename, utf::utf16(str), utf::BOMle);
+    }
+
     // Display elasps time in secononds.
-    std::cout << "Completed in " << std::fixed << std::setprecision(2) << elapsed_time / 1e9 << " seconds\n";
+    std::cerr << "Completed in " << std::fixed << std::setprecision(2) << elapsed_time / 1e9 << " seconds\n";
     
     infile.close();
     
     if (hasErrors() == true) {
-        std::cout << "❌ ERRORS!\n";
+        std::cerr << "❌ ERRORS!\n";
         remove(out_filename.c_str());
         return 0;
     }
     
-    std::cout << "✅ File '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
+    std::cerr << "✅ File '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
     
     return 0;
 }
