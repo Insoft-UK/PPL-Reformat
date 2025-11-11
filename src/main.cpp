@@ -28,6 +28,8 @@
 #include <iomanip>
 #include <unordered_set>
 #include <sys/time.h>
+#include <filesystem>
+
 #include "utf.hpp"
 
 #include "singleton.hpp"
@@ -615,7 +617,7 @@ void help(void)
 {
     std::cerr
     << "Copyright (C) 2024-" << YEAR << " Insoft.\n"
-    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << BUNDLE_VERSION << ")\n"
     << "\n"
     << "Usage: " << COMMAND_NAME << " <input-file>\n\n"
     << "Additional Commands:\n"
@@ -627,7 +629,7 @@ void help(void)
 void version(void) {
     std::cerr
     << "Copyright (C) 2024 Insoft.\n"
-    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << BUNDLE_VERSION << ")\n"
     << "Built on: " << DATE << "\n"
     << "Licence: MIT License\n\n"
     << "For more information, visit: http://www.insoft.uk\n";
@@ -674,8 +676,9 @@ protected:
 
 // MARK: - Main
 int main(int argc, char **argv) {
-    std::string in_filename, out_filename;
-
+    namespace fs = std::filesystem;
+    fs::path inpath, outpath;
+    
     if ( argc == 1 )
     {
         error();
@@ -686,11 +689,12 @@ int main(int argc, char **argv) {
         std::string args(argv[n]);
         
         if ( args == "-o" ) {
-            if ( n + 1 >= argc ) {
+            if ( ++n >= argc ) {
                 error();
                 exit(0);
             }
-            out_filename = std::filesystem::expand_tilde(argv[++n]);
+            outpath = fs::path(argv[n]);
+            outpath = fs::expand_tilde(outpath);
             continue;
         }
         
@@ -704,33 +708,26 @@ int main(int argc, char **argv) {
             return 0;
         }
         
-        in_filename = std::filesystem::expand_tilde(argv[n]);
-        std::regex re(R"(.\w*$)");
-        std::smatch extension;
+        inpath = fs::path(argv[n]);
+        inpath = fs::expand_tilde(inpath);
+        if (inpath.extension().empty()) inpath.replace_extension("prgm");
+        if (inpath.parent_path().empty()) inpath = fs::path("./") / inpath;
     }
     
-    info();
+    if (outpath != "/dev/stdout") info();
     
-    if (std::filesystem::path(in_filename).parent_path().empty()) {
-        in_filename = in_filename.insert(0, "./");
-    }
-    std::filesystem::path path = in_filename;
-    path = std::filesystem::expand_tilde(path);
-    
-    if (path.extension().empty()) {
-        path.append(".prgm");
-    } else if (path.extension() != ".prgm") {
+    if (inpath.extension() != ".prgm") {
         error();
         return 0;
     }
     
-    if (!std::filesystem::exists(path)) {
+    if (!std::filesystem::exists(inpath)) {
         error();
         return 0;
     }
     
-    if (out_filename.empty()) {
-        out_filename = path.parent_path().string() + "/" + path.stem().string() + "-ref.prgm";
+    if (outpath.empty()) {
+        outpath = inpath.parent_path() / (inpath.stem().string() + "-ref.prgm");
     }
 
     // Start measuring time
@@ -739,7 +736,7 @@ int main(int argc, char **argv) {
     std::string str;
 
     std::ifstream infile;
-    infile.open(in_filename, std::ios::in | std::ios::binary);
+    infile.open(inpath, std::ios::in | std::ios::binary);
     if(!infile.is_open())
     {
         error();
@@ -750,24 +747,25 @@ int main(int argc, char **argv) {
     // Stop measuring time and calculate the elapsed time.
     long long elapsed_time = timer.elapsed();
 
-    if (out_filename == "/dev/stdout") {
+    if (outpath == "/dev/stdout") {
         std::cout << str;
     } else {
-        utf::save(out_filename, utf::utf16(str), utf::BOMle);
+        utf::save(outpath, utf::utf16(str), utf::BOMle);
     }
 
     // Display elasps time in secononds.
-    std::cerr << "Completed in " << std::fixed << std::setprecision(2) << elapsed_time / 1e9 << " seconds\n";
+    std::cerr << "📣 Completed in " << std::fixed << std::setprecision(2) << elapsed_time / 1e9 << " seconds\n";
     
     infile.close();
     
     if (hasErrors() == true) {
         std::cerr << "❌ ERRORS!\n";
-        remove(out_filename.c_str());
+        remove(outpath.string().c_str());
         return 0;
     }
     
-    std::cerr << "✅ File '" << regex_replace(out_filename, std::regex(R"(.*/)"), "") << "' succefuly created.\n";
+    if (outpath != "/dev/stdout")
+        std::cerr << "✅ File " << outpath.filename() << " succefuly created.\n";
     
     return 0;
 }

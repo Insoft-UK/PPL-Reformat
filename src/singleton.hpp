@@ -24,6 +24,8 @@
 
 #include <iostream>
 #include <vector>
+#include <filesystem>
+
 #include "common.hpp"
 
 #include "comments.hpp"
@@ -32,7 +34,7 @@ using namespace ppl;
 
 class Singleton {
     
-    std::vector<std::string> _pathnames;
+    std::vector<std::filesystem::path> _paths;
     std::vector<long> _lines;
     static Singleton* _shared;
     
@@ -53,13 +55,13 @@ public:
     void incrementLineNumber(void);
     long currentLineNumber(void);
     
-    std::string currentPathname(void);
+    std::filesystem::path currentPath(void);
     
     // returns the pathname of
-    std::string getPath(void);
+    std::filesystem::path getPath(void);
     
-    void pushPathname(const std::string &pathname);
-    void popPathname(void);
+    void pushPath(const std::filesystem::path& path);
+    void popPath(void);
     
     
     
@@ -67,8 +69,8 @@ private:
     Singleton() {
         _currentline = 1;
     }
-    Singleton(const Singleton &);
-    Singleton& operator=(const Singleton &);
+    Singleton(const Singleton&);
+    Singleton& operator=(const Singleton&);
     
 protected:
     long _currentline;

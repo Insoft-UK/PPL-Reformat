@@ -37,7 +37,7 @@ bool hasErrors(void) {
 std::ostream& operator<<(std::ostream& os, MessageType type) {
     Singleton *singlenton = Singleton::shared();
 
-    if (singlenton->currentPathname() != "") os << singlenton->currentPathname() << ":";
+    if (singlenton->currentPath() != "") os << singlenton->currentPath() << ":";
     os << singlenton->currentLineNumber();
 
 
